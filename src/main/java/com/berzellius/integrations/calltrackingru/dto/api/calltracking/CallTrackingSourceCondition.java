@@ -18,6 +18,8 @@ public class CallTrackingSourceCondition{
 
     private String utmCampaign;
 
+    private Integer sourceId;
+
     private Integer projectId;
 
     private Integer truth;
@@ -91,5 +93,13 @@ public class CallTrackingSourceCondition{
 
     public void setPhonesCount(Integer phonesCount) {
         this.phonesCount = phonesCount;
+    }
+
+    public Integer getSourceId() {
+        return sourceId;
+    }
+
+    public void setSourceId(Integer sourceId) {
+        this.sourceId = sourceId;
     }
 }

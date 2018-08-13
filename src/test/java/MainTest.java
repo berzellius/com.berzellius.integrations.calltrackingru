@@ -1,11 +1,18 @@
 import com.berzellius.integrations.basic.exception.APIAuthException;
 import com.berzellius.integrations.calltrackingru.dto.api.calltracking.Call;
+import com.berzellius.integrations.calltrackingru.dto.api.calltracking.CallTrackingSourceCondition;
 import com.berzellius.integrations.calltrackingru.dto.api.errorhandlers.CalltrackingAPIRequestErrorHandler;
 import com.berzellius.integrations.service.CallTrackingAPIService;
 import com.berzellius.integrations.service.CallTrackingAPIServiceImpl;
 import org.junit.Before;
 import org.junit.Test;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.Calendar;
 import java.util.Date;
@@ -22,8 +29,8 @@ public class MainTest {
 
     private Date earlyDate(){
         Calendar calendar = Calendar.getInstance();
-        calendar.set(Calendar.YEAR, 2016);
-        calendar.set(Calendar.MONTH, Calendar.NOVEMBER);
+        calendar.set(Calendar.YEAR, 2017);
+        calendar.set(Calendar.MONTH, Calendar.DECEMBER);
         calendar.set(Calendar.DAY_OF_MONTH, 1);
         calendar.set(Calendar.HOUR, 0);
         calendar.set(Calendar.MINUTE, 0);
@@ -35,7 +42,7 @@ public class MainTest {
 
     private Date lateDate(){
         Calendar calendar = Calendar.getInstance();
-        calendar.set(Calendar.YEAR, 2016);
+        calendar.set(Calendar.YEAR, 2017);
         calendar.set(Calendar.MONTH, Calendar.DECEMBER);
         calendar.set(Calendar.DAY_OF_MONTH, 31);
         calendar.set(Calendar.HOUR, 23);
@@ -70,6 +77,34 @@ public class MainTest {
     public void testReadCalls() throws APIAuthException {
         List<Call> callList = this.getCallTrackingAPIService().getCalls(this.earlyDate(), this.lateDate(), 0l, 100, getDefaultProjectId());
         System.out.println(callList);
+    }
+
+    @Test
+    public void testUtmSources() throws APIAuthException {
+        List<CallTrackingSourceCondition> sourceConditions = this.getCallTrackingAPIService().getAllMarketingChannelsFromCalltracking();
+
+        for(CallTrackingSourceCondition callTrackingSourceCondition : sourceConditions){
+            System.out.println(callTrackingSourceCondition.getProjectId() + ": #"
+                    + callTrackingSourceCondition.getSourceId().toString() + "/"
+                    + callTrackingSourceCondition.getSourceName());
+        }
+    }
+
+    @Test
+    public void testLogIn(){
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders requestHeaders = new HttpHeaders();
+        requestHeaders.add("Content-type", MediaType.APPLICATION_FORM_URLENCODED_VALUE);
+
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("login", "voloshko@e-vrika.ru");
+        params.add("password", "Evrika12435687");
+
+        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(params, requestHeaders);
+
+        HttpEntity<String> response = restTemplate.exchange(this.getCallTrackingAPIService().getWebSiteLoginUrl(), HttpMethod.POST, request, String.class);
+        //System.out.println(response.getBody());
+        System.out.println(response.getHeaders());
     }
 
     public CallTrackingAPIService getCallTrackingAPIService() {

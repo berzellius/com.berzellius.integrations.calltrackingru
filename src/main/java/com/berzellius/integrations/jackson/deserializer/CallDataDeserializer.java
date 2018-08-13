@@ -67,7 +67,7 @@ public class CallDataDeserializer extends JsonDeserializer<List<Call>> {
                             params.put(callField, callFieldValue.toString());
                         }
 
-                        System.out.println("params from call: " + params);
+                        //System.out.println("params from call: " + params);
                         calls.add(new Call(num, date, source, Call.Status.valueByString(status), params));
                     }
                 }

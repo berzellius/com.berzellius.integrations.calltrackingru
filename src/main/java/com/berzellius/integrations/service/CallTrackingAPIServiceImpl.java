@@ -3,15 +3,6 @@ package com.berzellius.integrations.service;
 import com.berzellius.integrations.basic.exception.APIAuthException;
 import com.berzellius.integrations.basic.service.APIServiceRequestsImpl;
 import com.berzellius.integrations.calltrackingru.dto.api.calltracking.*;
-import org.apache.http.Header;
-import org.apache.http.HttpResponse;
-import org.apache.http.NameValuePair;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.message.BasicNameValuePair;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -26,8 +17,6 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.ResponseErrorHandler;
 import org.springframework.web.client.RestTemplate;
 
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -116,6 +105,7 @@ public class CallTrackingAPIServiceImpl extends APIServiceRequestsImpl implement
 
         List<MediaType> mediaTypes = new ArrayList<MediaType>();
         mediaTypes.add(MediaType.TEXT_HTML);
+        mediaTypes.add(MediaType.APPLICATION_JSON);
 
         List<MediaType> formsMediaTypes = new ArrayList<MediaType>();
         formsMediaTypes.add(MediaType.APPLICATION_FORM_URLENCODED);
@@ -161,8 +151,16 @@ public class CallTrackingAPIServiceImpl extends APIServiceRequestsImpl implement
             return false;
 
         for(String cookie : this.cookies){
+            //System.out.println("found cookie:" + cookie);
             String[] strings = cookie.split("=");
-            if(strings.length > 0 && strings[0].equals("I-CMS_AUTH")){
+            if(
+                    strings.length > 0 &&
+                        (
+                                strings[0].equals("I-CMS_AUTH") ||
+                                        strings[0].equals("laravel_session")
+                        )
+                    )
+            {
                 return true;
             }
         }
@@ -174,10 +172,11 @@ public class CallTrackingAPIServiceImpl extends APIServiceRequestsImpl implement
     @Override
     public List<CallTrackingSourceCondition> getAllMarketingChannelsFromCalltracking() throws APIAuthException {
         websiteLogIn();
-
+        log.info("logged in successfully..");
         List<CallTrackingSourceCondition> callTrackingSourceConditions = new LinkedList<>();
 
         for(Integer projectId : this.getProjects()){
+            log.info("project " + projectId);
             getAllMarketingChannelsFromCalltrackingByProjectId(projectId, callTrackingSourceConditions);
         }
 
@@ -231,9 +230,11 @@ public class CallTrackingAPIServiceImpl extends APIServiceRequestsImpl implement
                             callTrackingSourceCondition.setUtmSource(utmSource);
                             callTrackingSourceCondition.setUtmMedium(utmMedium);
                             callTrackingSourceCondition.setUtmCampaign(utmCampaign);
+                            callTrackingSourceCondition.setSourceId(callTrackingWebsiteSourceCondition.getSourceId());
                             callTrackingSourceCondition.setProjectId(projectId);
                             callTrackingSourceCondition.setTruth(truth);
                             callTrackingSourceCondition.setPhonesCount(callTrackingWebsiteSource.getPhones_count());
+
 
                             listToPush.add(callTrackingSourceCondition);
                         }
@@ -246,38 +247,31 @@ public class CallTrackingAPIServiceImpl extends APIServiceRequestsImpl implement
 
     private void websiteLogIn() throws APIAuthException {
         this.reLogins = 0;
+        System.out.println("relogins: " + this.reLogins);
 
         while (!this.checkWebsiteLoggedIn()) {
             System.out.println("loggin in..");
             if(this.reLogins > this.reLoginsMax){
                 throw new APIAuthException("cant login to calltracking website");
             }
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders requestHeaders = new HttpHeaders();
+            requestHeaders.add("Content-type", MediaType.APPLICATION_FORM_URLENCODED_VALUE);
 
-            HttpClient client = new DefaultHttpClient();
-            HttpPost post = new HttpPost(this.getWebSiteLoginUrl());
-            post.setHeader("User-Agent", "Mozilla/5.0");
-            List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
-            urlParameters.add(new BasicNameValuePair("email", this.getWebSiteLogin()));
-            urlParameters.add(new BasicNameValuePair("password", this.getWebSitePassword()));
+            MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+            params.add("login", this.getWebSiteLogin());
+            params.add("password", this.getWebSitePassword());
 
-            try {
-                this.cookies = new LinkedList<>();
-                post.setEntity(new UrlEncodedFormEntity(urlParameters));
-                HttpResponse response = client.execute(post);
+            HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(params, requestHeaders);
+            this.cookies = new LinkedList<>();
+            System.out.println("url: " + this.getWebSiteLoginUrl());
+            HttpEntity<String> response = restTemplate.exchange(this.getWebSiteLoginUrl(), HttpMethod.POST, request, String.class);
 
-                Header[] headers = response.getAllHeaders();
-
-                for (Header header : headers) {
-                    if (header.getName().equals("Set-Cookie")) {
-                        this.cookies.add(header.getValue());
-                    }
+            HttpHeaders httpHeaders = response.getHeaders();
+            if(httpHeaders.containsKey("Set-Cookie")){
+                for(String cookie : httpHeaders.get("Set-Cookie")){
+                    this.cookies.add(cookie.split(";")[0]);
                 }
-            } catch (UnsupportedEncodingException e) {
-                System.out.println("encoding not supported!");
-            } catch (ClientProtocolException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
             }
 
             this.reLogins++;
